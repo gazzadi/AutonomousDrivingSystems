@@ -25,9 +25,9 @@ namespace lidar_obstacle_detection
     viewer_->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_OPACITY, 10000.0, "c_"+std::to_string(id));
   }
 
-  void Renderer::addText(float centroid_x, float centroid_y, float centroid_z,const std::string&  id){
+  void Renderer::addText(float centroid_x, float centroid_y, float centroid_z, const std::string&  id){
 
-    viewer_->addText3D (id, pcl::PointXYZ(centroid_x, centroid_y, 0),0.5, 255, 0, 0, "", 0);
+    viewer_->addText3D (id, pcl::PointXYZ(centroid_x, centroid_y, 0),0.5, 0, 255, 0, "", 0);
     
   }
 
@@ -135,8 +135,10 @@ namespace lidar_obstacle_detection
     if(opacity < 0.0) opacity = 0.0;
 
     std::string cube = "box"+std::to_string(id);
+    const std::string label = "_"+cube;
 
     viewer_->addCube(box.x_min, box.x_max, box.y_min, box.y_max, box.z_min, box.z_max, color.r, color.g, color.b, cube);
+    //addText((box.x_max + box.x_min)/2.0f, (box.y_max + box.y_min)/2.0f, (box.z_max + box.z_min)/2.0f, label);//std::to_string(box.label))
 
     viewer_->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_REPRESENTATION,
                                         pcl::visualization::PCL_VISUALIZER_REPRESENTATION_WIREFRAME, cube);
