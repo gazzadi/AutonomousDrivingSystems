@@ -21,7 +21,7 @@
 #include <unordered_set>
 #include "../include/tree_utilities.hpp"
 #include <boost/filesystem.hpp>
-namespace fs = boost::filesystem;
+snamespace fs = boost::filesystem;
 //#define USE_PCL_LIBRARY
 using namespace lidar_obstacle_detection;
 
@@ -99,16 +99,23 @@ std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::Po
 	std::vector<pcl::PointIndices> clusters;                                             //vector of PointIndices that will contain all the clusters
     std::vector<int> cluster;                                                            //vector of int that is used to store the points that the function proximity will give me back
 
-    std::cout << "Iterating through the point cloud:" << std::endl;
-    for (auto& point : *cloud) {
-        // Ora puoi accedere direttamente ai campi x, y, z
-        std::cout << "  X: " << point.x
-                  << ", Y: " << point.y
-                  << ", Z: " << point.z << std::endl;
-        
-        // Puoi anche modificare i valori
-        // point.x = 0.0; 
+    
+    //for (int i=0; i<tree)
+    for(int idx = 0; idx < cloud->points.size(); idx++)
+    {
+        if(visited.find(idx) == visited.end())
+        {   
+            //cluster.clear(); // reset what is inside cluster
+            proximity(cloud, idx, tree, distanceTol, visited, cluster, setMaxClusterSize);
+            if(cluster.size() >= setMinClusterSize)
+            {
+                pcl::PointIndices current_cluster;
+                current_cluster.indices = std::move(cluster);
+                clusters.push_back(std::move(current_cluster));
+            }
+        }
     }
+	return clusters;
 
     //for every point of the cloud
     //  if the point has not been visited (use the function called "find")
@@ -119,7 +126,7 @@ std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::Po
     //    end if
     //  end if
     //end for
-	return clusters;	
+	//return clusters;	
 }
 
 int user_data;
@@ -240,7 +247,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         // Optional assignment
         my_pcl::KdTree treeM;
         treeM.set_dimension(3);
-        setupKdtree(cloud_filtered, &treeM, 3);
+        setupKdtree(cloud_filtered, &treeM, 3); //dentro quindi il tree ha elementi formati da x y z
         
         std::vector<pcl::PointIndices> cluster_indices;
         cluster_indices = euclideanCluster(
