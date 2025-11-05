@@ -220,6 +220,9 @@ void ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointX
         i++;
     }
 
+    
+
+
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
     tree->setInputCloud (cloud_filtered); 
 
@@ -268,7 +271,6 @@ void ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointX
     int j = 0;
     int clusterId = 0;
     std::vector<Box> boxes;
-    float max_x_dim = 0, max_y_dim = 0, max_z_dim = 0;
     for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
     {
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZ>);
@@ -307,6 +309,7 @@ void ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointX
         //  so in the label we can say that is a car and we can color the object giving more enfasys to red
         float xz_proportion = x_dim / z_dim;
         float xy_proportion = x_dim / y_dim;
+        // we define the error range for the ration of the objects
         float range_percentage_car = 0.33f;
         float range_percentage_bike = 0.33f;
         float range_percentage_person = 0.33f;

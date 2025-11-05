@@ -24,7 +24,7 @@ For the detection i've used range based on this values but applying a ±33%
 #### Dataset_1
 The following parameters are the one that i've used to clustering on the first dataset:
 - **voxelFiltering-leafSize** = 0,2m in each dimension
-- **segmentation** = 
+- **segmentation** 
     - RANSAC algorithm until only 25% of the original cloud remain
     - distanceThreshold = 0.2
 - **clustering** = euclidean clustering, with these parameters:
@@ -52,6 +52,19 @@ The complexity of the scene makes the finetuning done on dataset_1 not very usef
 I've tried changing some of the parameters to see better results, but it did't work really well, i will discuss here which parameters i changed and the effect obtained:
 - Increasing DistanceThreshold in segmentation from 0,2m to 0,3m: this take care of the sidewalk on the curves and slighlty improve the result
 - Decreasing the percentage of cloud i want after the segmentation phase from 25% to 20%: this helped a little, i've tried to go even lower but the information lost was too much.
-- Increasing the clusterTolerance from 0.6cm to 0.8cm
+- Increasing the clusterTolerance from 0.6m to 0.8m to simplify the clustering process in areas where the points of object are more sparse
 
-I think 
+Even with this modification the clustering on this scenario is not very efficient, probably for these reasons:
+- The finetuning is not a good way to find a solution, because the movement of the car made it work for some areas (like in the beginning and in the end) but do a poor job on very noisy areas like the turn in the middle.
+- This dataset represent a scene with a lot of different actors, so clustering with the same principle all the different object maybe it's not he best solution, probabily we need to implement a different strategy of clustering. The euclidean clustering maybe it's not the best solution for this scenario.
+- Some of the surface in the point cloud are not plain, so the segmentation phase don't work very well and that is creating some problems detecting the clusters.
+- The cropping method implemented it's very basic, maybe cropping the area with a well sized sphere can give better result to take out all the not useful data.
+
+Now want to talk brifly about the naive object detection implemented. In this second dataset we have more interesting result, but still not very precise.
+In the part where the clustering work better, the car are detected correctely, and even a bike is detected for a good amount of frames.
+But we see all the limit of the implementation in the person detection, that due to the not so precise clustering, and the variable size ratio have a difficult time identifing the person. Sometimes it even identify a pole as a person.
+I can conlude that this naive approach to object detection, even if it can be useful for a vague car detection, it's not very reliable with other objects. Even trying to increasing the error on the ratio doesn't give more useful results.
+
+
+
+

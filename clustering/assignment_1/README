@@ -1,4 +1,11 @@
-Academic Year: 2025/2026
+# INFORMATION
+Project about clustering of object surrounding a moving car on two different scenarios.
+
+The report with all the information about the solustion it's in the file **Report.md**
+
+---
+
+# INSTRUCTIONS
 
 * Assignment #1 Euclidean clustering object detection:
     - Objective: Find and segment cars and pedestrians lying on the road
@@ -34,3 +41,5 @@ You have to change the following line of code:
 
 into the path that contains your dataset 
 or modify the code to accept a command line dataset
+
+
