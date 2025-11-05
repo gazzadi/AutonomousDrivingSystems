@@ -360,26 +360,6 @@ void ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointX
 
 }
 
-bool
-customRegionGrowing (const PointTypeFull& point_a, const PointTypeFull& point_b, float squared_distance)
-{
-  Eigen::Map<const Eigen::Vector3f> point_a_normal = point_a.getNormalVector3fMap (), point_b_normal = point_b.getNormalVector3fMap ();
-  if (squared_distance < 10000)
-  {
-    if (std::abs (point_a.intensity - point_b.intensity) < 8.0f)
-      return (true);
-    if (std::abs (point_a_normal.dot (point_b_normal)) > std::cos (30.0f / 180.0f * static_cast<float> (M_PI)))
-      return (true);
-  }
-  else
-  {
-    if (std::abs (point_a.intensity - point_b.intensity) < 3.0f)
-      return (true);
-  }
-  return (false);
-}
-
-
 int main(int argc, char* argv[])
 {
     Renderer renderer;
