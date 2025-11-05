@@ -21,8 +21,8 @@
 #include <unordered_set>
 #include "../include/tree_utilities.hpp"
 #include <boost/filesystem.hpp>
-snamespace fs = boost::filesystem;
-//#define USE_PCL_LIBRARY
+namespace fs = boost::filesystem;
+#define USE_PCL_LIBRARY
 using namespace lidar_obstacle_detection;
 
 typedef std::unordered_set<int> my_visited_set_t;
@@ -95,78 +95,85 @@ TODO: Complete the function
 */
 std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, my_pcl::KdTree* tree, float distanceTol, int setMinClusterSize, int setMaxClusterSize)
 {
-	my_visited_set_t visited{};                                                          //already visited points
-	std::vector<pcl::PointIndices> clusters;                                             //vector of PointIndices that will contain all the clusters
-    std::vector<int> cluster;                                                            //vector of int that is used to store the points that the function proximity will give me back
+	my_visited_set_t visited{};                 //already visited points
+	std::vector<pcl::PointIndices> clusters;    //vector of PointIndices that will contain all the clusters
+    std::vector<int> cluster;                   //vector of int that is used to store the points that the function proximity will give me back
 
-    
-    //for (int i=0; i<tree)
-    for(int idx = 0; idx < cloud->points.size(); idx++)
+    for(int i = 0; i < cloud->points.size(); i++)
     {
-        if(visited.find(idx) == visited.end())
+        if(visited.find(i) == visited.end())
         {   
-            //cluster.clear(); // reset what is inside cluster
-            proximity(cloud, idx, tree, distanceTol, visited, cluster, setMaxClusterSize);
+            // cleaning the last cluster to start with a fresh one 
+            cluster.clear();
+            proximity(cloud, i, tree, distanceTol, visited, cluster, setMaxClusterSize);
+            // if the cluster found with proximity is big enough, we add it to the clusters list
             if(cluster.size() >= setMinClusterSize)
             {
                 pcl::PointIndices current_cluster;
+                // with move construct we are saying to the compiler that the variable that we are moving we are sure that will not be used in the future, 
+                // and so we can move that to the other variabile
                 current_cluster.indices = std::move(cluster);
                 clusters.push_back(std::move(current_cluster));
             }
         }
     }
 	return clusters;
-
-    //for every point of the cloud
-    //  if the point has not been visited (use the function called "find")
-    //    find clusters using the proximity function
-    //
-    //    if we have more clusters than the minimum
-    //      Create the cluster and insert it in the vector of clusters. You can extract the indices from the cluster returned by the proximity funciton (use pcl::PointIndices)   
-    //    end if
-    //  end if
-    //end for
-	//return clusters;	
 }
 
 int user_data;
 
-void 
-ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud)
+void ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud)
 {
-    // --- Mostra la point cloud originale ---
-    
-    // TODO: 1) Downsample the dataset h
+    // ----
+    // Here we are going to reduce the amount of point in our cloud, to reduce the volume of the work we need to do to proces it
+    // ----
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
     pcl::VoxelGrid<pcl::PointXYZ> filterer;
     filterer.setInputCloud (cloud);
-    filterer.setLeafSize (0.2f, 0.2f, 0.2f); //this value defines how much the PC is filtered
+    // Changing the leaf size permit us to determine the shape of the box used fo filtering, the value are expressed in meters
+    // Incresing this value will leave us with a too sparse cloud, but reducing it too much we will have too many information 
+    // to process it in a feasible time for real-time calculation
+    filterer.setLeafSize (0.2f, 0.2f, 0.2f);
     filterer.filter (*cloud_filtered);
 
 
-    // 2) here we crop the points that are far away from us, in which we are not interested
+    // Cropping out point outside our "relevant area"
+    /*data for dataset_1
     pcl::CropBox<pcl::PointXYZ> cb(true);
     cb.setInputCloud(cloud_filtered);
     
     cb.setMin(Eigen::Vector4f (-20, -6, -2, 1));
     cb.setMax(Eigen::Vector4f ( 30, 7, 5, 1));
     cb.filter(*cloud_filtered); 
+    */
+   
+    pcl::CropBox<pcl::PointXYZ> cb(true);
+    cb.setInputCloud(cloud_filtered);
+    
+    cb.setMin(Eigen::Vector4f (-20, -6, -2, 1));
+    cb.setMax(Eigen::Vector4f ( 20, 7, 5, 1));
+    cb.filter(*cloud_filtered);
 
-    // TODO: 3) Segmentation and apply RANSAC
-    // TODO: 4) iterate over the filtered cloud, segment and remove the planar inliers 
+    // ----
+    // In the segmentation phase we are detecting plane in our point cloud, 
+    // that we want to delete to reduce the cloud to only the point relevant to our clustering.
+    // ----
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_segmented (new pcl::PointCloud<pcl::PointXYZ>),  //point cloud with planes
         cloud_aux (new pcl::PointCloud<pcl::PointXYZ>); //aux point cloud
-    // Create the segmentation object
+
     pcl::SACSegmentation<pcl::PointXYZ> seg;
-    // Optional
+    
     seg.setOptimizeCoefficients (true);
-    // Mandatory
+    
     seg.setModelType (pcl::SACMODEL_PLANE);
     seg.setMethodType (pcl::SAC_RANSAC);
     seg.setMaxIterations (1000);
-    seg.setDistanceThreshold (0.2); // determines how close a point must be to the model in order to be considered an inlier
+    // With the DistanceThreshold we determine the depth of our plane.
+    // if we put the distance threshold too long we could cut out point too distant from the plane, 
+    // losing informatiomation that would possibly be interesting
+    seg.setDistanceThreshold (0.3);
 
     int i = 0, nr_points = (int) cloud_filtered->size ();
     
@@ -174,8 +181,9 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ()); //the resultant model coefficients
     //inliers represent the points of the point cloud representing the plane, coefficients of the model that represents the plane (4 points of the plane)
     pcl::PointIndices::Ptr inliers (new pcl::PointIndices ()); 
-    // While 30% of the original cloud is still there
-    while (cloud_filtered->size () > 0.25 * nr_points)
+    // In the condition of this wwhile we can explicit the % of point of the cloud thta we want to maintain after the segnementation,
+    // so the while will end only when we reached that %
+    while (cloud_filtered->size () > 0.20 * nr_points)
     {
         // Segment the largest planar component from the remaining cloud <-
         seg.setInputCloud (cloud_filtered);
@@ -212,39 +220,25 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         i++;
     }
 
-    
-
-
-    // TODO: 5) Create the KDTree and the vector of PointIndices
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
     tree->setInputCloud (cloud_filtered); 
 
-
-    // TODO: 6) Set the spatial tolerance for new cluster candidates (pay attention to the tolerance!!!)
-    
     #ifdef USE_PCL_LIBRARY
-
-        cout<<"pcl library"<<endl;
-        //PCL functions
-        //HERE 6)
-
         //If you take a very small value, it can happen that an actual object can be seen as multiple clusters. 
         //On the other hand, if you set the value too high, it could happen, that multiple objects are seen as one cluster
         
         pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-        ec.setClusterTolerance (0.7); // 2cm
+        ec.setClusterTolerance (0.8);
 
         //We impose that the clusters found must have at least setMinClusterSize() points and maximum setMaxClusterSize() points
         ec.setMinClusterSize (20);
-        ec.setMaxClusterSize (10000);
+        ec.setMaxClusterSize (500);
         ec.setSearchMethod (tree);
         ec.setInputCloud (cloud_filtered);
         
         std::vector<pcl::PointIndices> cluster_indices;
         ec.extract (cluster_indices);
     #else
-        cout<<"non sto usando la pcl library"<<endl;
-        // Optional assignment
         my_pcl::KdTree treeM;
         treeM.set_dimension(3);
         setupKdtree(cloud_filtered, &treeM, 3); //dentro quindi il tree ha elementi formati da x y z
@@ -253,21 +247,18 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         cluster_indices = euclideanCluster(
             cloud_filtered, 
             &treeM, 
-            0.7,//clusterTolerance 
-            20,//setMinClusterSize 
-            10000);//setMaxClusterSize
+            0.6,    //clusterTolerance 
+            20,     //setMinClusterSize 
+            500); //setMaxClusterSize
     #endif
 
     std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(1,0,1), Color(0,1,1)};
 
-    /*
-    renderer.ClearViewer();
-    renderer.RenderPointCloud(cloud_filtered, "cloud_filtrata_background", Color(0.1, 0.2, 0.9));
-    renderer.RenderPointCloud(cloud, "cloud_originale", Color(0.1,0.1,0.1));
-    /*
-    std::cout << "Mostrando la point cloud prima del filtering. Premi Invio per continuare..." << std::endl;
-    std::cin.get(); // Mette in pausa l'esecuzione finché non premi Invio
-    */
+    //Uncomment this this block of code to show the original point cloud and the one with only point eligible for clustering
+    //renderer.ClearViewer();
+    //renderer.RenderPointCloud(cloud_filtered, "cloud_filtrata_background", Color(0.1, 0.2, 0.9));
+    //renderer.RenderPointCloud(cloud, "cloud_originale", Color(0.1,0.1,0.1));
+    
 
     /**Now we extracted the clusters out of our point cloud and saved the indices in cluster_indices. 
 
@@ -277,6 +268,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     int j = 0;
     int clusterId = 0;
     std::vector<Box> boxes;
+    float max_x_dim = 0, max_y_dim = 0, max_z_dim = 0;
     for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
     {
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZ>);
@@ -286,27 +278,16 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         cloud_cluster->height = 1;
         cloud_cluster->is_dense = true;
 
-        //renderer.RenderPointCloud(cloud,"originalCloud"+std::to_string(clusterId),colors[2]);
-        // TODO: 7) render the cluster and plane without rendering the original cloud 
-        //<-- here
-        //----------
-
         //Here we create the bounding box on the detected clusters
         pcl::PointXYZ minPt, maxPt;
         pcl::getMinMax3D(*cloud_cluster, minPt, maxPt);
 
-        //TODO: 8) Here you can plot the distance of each cluster w.r.t ego vehicle
         Box box{clusterId, minPt.x, minPt.y, minPt.z,
         maxPt.x, maxPt.y, maxPt.z};
-        //TODO: 9) Here you can color the vehicles that are both in front and 5 meters away from the ego vehicle
-        //please take a look at the function RenderBox to see how to color the box
         
-
         boxes.insert(boxes.end(), box);
-        //renderer.RenderBox(box, j);
 
         ++clusterId;
-        //j++;
     }  
     
     for (int it=0; it != boxes.size(); ++it)
@@ -316,48 +297,83 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         float y_dim = box.y_max - box.y_min;
         float z_dim = box.z_max - box.z_min;
 
-        //cout<<"Oggetto "<<it<<endl;
-        /*cout<<x_dim<<endl;
-        cout<<y_dim<<endl;
-        cout<<z_dim<<endl;
-        */
-        std::string cube = "box"+std::to_string(it);
-        const std::string label = "_"+cube;
-        
-        
-        //x lunghezza
-        //y larghezza
-        //z altezza
-        float red = x_dim / 7;
-        float green = y_dim / 7;
-        float blue = z_dim / 7;
-        /*cout<<"red: "<<red;
-        cout<<" green: "<<green;
-        cout<<" blue: "<<blue<<endl;
-        */
+        float red = 0.2f;
+        float green = 0.2f;
+        float blue = 0.2f;
+
+        std::string box_label = std::to_string(it);
+        //car average size 4-5 meters long, about 1.9 meters wide, and about 1.5 meters high
+        //  if we found an object with proportion x ~ 3z && x ~ 2,25y we can suppose the object is a car
+        //  so in the label we can say that is a car and we can color the object giving more enfasys to red
+        float xz_proportion = x_dim / z_dim;
+        float xy_proportion = x_dim / y_dim;
+        float range_percentage_car = 0.33f;
+        float range_percentage_bike = 0.33f;
+        float range_percentage_person = 0.33f;
+        if (
+            xz_proportion > 3.0f - (3.0f * range_percentage_car) &&
+            xz_proportion < 3.0f + (3.0f * range_percentage_car) && 
+            xy_proportion > 2.25f - (2.25f * range_percentage_car) &&
+            xy_proportion < 2.25f + (2.25f * range_percentage_car)     
+        ){
+            //it's a car
+            box_label += "car";
+            red=0.9f;
+        } else {
+            if (
+                xz_proportion > 0.13f - (0.13f * range_percentage_person) && 
+                xz_proportion < 0.13f + (0.13f * range_percentage_person) && 
+                xy_proportion > 0.55f - (0.55f * range_percentage_person) && 
+                xy_proportion < 0.55f + (0.55f * range_percentage_person)
+            )
+            {
+                //it's a person
+                box_label += "person";
+                blue=0.9f;
+            } else {
+                if(
+                    xz_proportion > 1.5f - (1.5f * range_percentage_bike) && 
+                    xz_proportion < 1.5f + (1.5f * range_percentage_bike) && 
+                    xy_proportion > 3.14f - (3.14f * range_percentage_bike) &&
+                    xy_proportion < 3.14f + (3.14f * range_percentage_bike) 
+                )
+                {
+                    //it's a motorcycle
+                    box_label += "bike";
+                    green=0.9f;
+                } else {
+                    box_label += "unclassified";
+                }
+            }
+        }
+
         renderer.addText((box.x_max + box.x_min)/2.0f, 
                         (box.y_max + box.y_min)/2.0f, 
                         (box.z_max + box.z_min)/2.0f, 
-                        label);
+                        std::move(box_label));
         renderer.RenderBox(box, j, Color(red,green,blue));
-        //renderer.RenderText(box, j, Color(0,1,0));
-        /*if (box.x_dim < 3.5f 
-        && box.y_dim < 1.5f 
-        && box.z_dim < 1.2f)
-        {
-            renderer.RenderBox(box, j, Color(0,0,1));
-            cout<<" piccolo"<<endl;
-        }
-        else
-        {
-            renderer.RenderBox(box, j, Color(1,0,0));
-            cout<<" grande"<<endl;
-        }*/
-
         j++;
     }
-    //std::cin.get();
 
+}
+
+bool
+customRegionGrowing (const PointTypeFull& point_a, const PointTypeFull& point_b, float squared_distance)
+{
+  Eigen::Map<const Eigen::Vector3f> point_a_normal = point_a.getNormalVector3fMap (), point_b_normal = point_b.getNormalVector3fMap ();
+  if (squared_distance < 10000)
+  {
+    if (std::abs (point_a.intensity - point_b.intensity) < 8.0f)
+      return (true);
+    if (std::abs (point_a_normal.dot (point_b_normal)) > std::cos (30.0f / 180.0f * static_cast<float> (M_PI)))
+      return (true);
+  }
+  else
+  {
+    if (std::abs (point_a.intensity - point_b.intensity) < 3.0f)
+      return (true);
+  }
+  return (false);
 }
 
 
